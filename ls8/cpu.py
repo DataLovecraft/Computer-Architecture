@@ -3,42 +3,46 @@
 import sys
 
 # MAIN OPCODES
-LDI = 0b10000010
-HLT = 0b00000001
-PRN = 0b01000111
-MUL = 0b10100010
-NOP = 0b00000000
-POP = 0b01000110
-RET = 0b00010001
-CALL = 0b01010000
-PUSH = 0b01000101
-SP = 0b00000111
-ADD = 0b10100000
-SUB = 0b10100001
-CMP = 0b10100111
+LDI = 0b10000010    # Load immediate
+HLT = 0b00000001    # Halt cpu and exit emulator
+PRN = 0b01000111    # print 
+NOP = 0b00000000    # No operation
+
+# ALU operations: 
+ADD = 0b10100000    # Addition
+SUB = 0b10100001    # Subtraction
+MUL = 0b10100010    # Multiplication
+CMP = 0b10100111    # Compare
+MOD = 0b10100100    # modulo
+SHL = 0b10101100    # shift left
+SHR = 0b10101101    # shift right
+AND = 0b10101000    # Bitwise and
+XOR = 0b10101011    # Bitwise exclusive or
+OR = 0b10101010     # Bitwise or
+NOT = 0b01101001    # Bitwise not
+
+# Stack
+SP = 0b00000111     # Stack pointer
+PUSH = 0b01000101   # Push to stack
+POP = 0b01000110    # Pop from stack
+
+# Subroutines
+CALL = 0b01010000   # Subroutine call
+RET = 0b00010001    # Return from subroutine
 EQ = 0b00000111
-JMP = 0b01010100
-JEQ = 0b01010101
-JNE = 0b01010110
-
-# BITWISE ALU OPCODES 
-AND = 0b10101000
-MOD = 0b10100100
-SHL = 0b10101100
-SHR = 0b10101101
-XOR = 0b10101011
-OR = 0b10101010
-NOT = 0b01101001
-
+JMP = 0b01010100    # Jump
+JEQ = 0b01010101    # Jump if equal
+JNE = 0b01010110    # Jump if not equal
 
 class CPU:
     """Main CPU class."""
     def __init__(self):
-        self.ram = [0] * 256
-        self.reg = [0] * 8
-        self.flag_reg = [0] * 8
-        self.pc = 0
-        self.running = True
+        self.ram = [0] * 256     # Ram
+        self.reg = [0] * 8       # Registers
+        self.flag_reg = [0] * 8  # Flags 
+        self.pc = 0              # Program counter
+        self.running = True      # machine state
+        
         self.branch_table = {
             NOP : self.NOP,
             HLT : self.HLT,
@@ -79,33 +83,44 @@ class CPU:
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
+        
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        
         elif op == "SUB":
             self.reg[reg_a] -= self.reg[reg_b]
+        
         elif op == "CMP":
             if reg_a == reg_b:
                 self.flag_reg[EQ] = 0b00000001
             else:
                 self.flag_reg[EQ] = 0b00000000
+        
         elif op == "AND":
             self.reg[reg_a] = self.reg[reg_a] & self.reg[reg_b]
+        
         elif op == "MOD":
             if self.reg[reg_b] == 0:
                 print("Cannot mod by value of 0")
                 self.HLT(reg_a, reg_b)
             else:
                 self.reg[reg_a] %= self.reg[reg_b]
+        
         elif op == "SHL":
             self.reg[reg_a] << self.reg[reg_b]
+        
         elif op == "SHR":
             self.reg[reg_a] >> self.reg[reg_b]
+        
         elif op == "OR":
             self.reg[reg_a] = self.reg[reg_a] | self.reg[reg_b]
+        
         elif op == "NOT":
             self.reg[reg_a] -= 0b11111111
+        
         elif op == "XOR":
             self.reg[reg_a] = self.reg[reg_a] ^ self.reg[reg_b]
+        
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -199,21 +214,20 @@ class CPU:
             self.pc = self.reg[reg_a]
         else:
             self.pc += 2
-
-    def run(self):
-        while self.running:
-            ir = self.ram_read(self.pc)
-            pc_flag = (ir & 0b00010000) >> 4
-            reg_num1 = self.ram[self.pc +1]
-            reg_num2 = self.ram[self.pc + 2]
-            self.branch_table[ir](reg_num1, reg_num2)
-            if pc_flag == 0:
-                move = int((ir & 0b11000000) >> 6)
-                self.pc += move + 1
-            
-
+    
     def ram_read(self, address):
         return self.ram[address]
     
     def ram_write(self, address, value):
         self.ram[address] = value
+    
+    def run(self):
+        while self.running:
+            ir = self.ram_read(self.pc)
+            pc_flag = (ir & 0b00010000) >> 4
+            reg_num1 = self.ram[self.pc + 1]
+            reg_num2 = self.ram[self.pc + 2]
+            self.branch_table[ir](reg_num1, reg_num2)
+            if pc_flag == 0:
+                move = int((ir & 0b11000000) >> 6)
+                self.pc += move + 1
