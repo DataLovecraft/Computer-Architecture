@@ -2,137 +2,207 @@
 
 import sys
 
-# MAIN OPCODES
-LDI = 0b10000010    # Load immediate
-HLT = 0b00000001    # Halt cpu and exit emulator
-PRN = 0b01000111    # print 
-NOP = 0b00000000    # No operation
-
-# ALU operations: 
-ADD = 0b10100000    # Addition
-SUB = 0b10100001    # Subtraction
-MUL = 0b10100010    # Multiplication
-CMP = 0b10100111    # Compare
-MOD = 0b10100100    # modulo
-SHL = 0b10101100    # shift left
-SHR = 0b10101101    # shift right
-AND = 0b10101000    # Bitwise and
-XOR = 0b10101011    # Bitwise exclusive or
-OR = 0b10101010     # Bitwise or
-NOT = 0b01101001    # Bitwise not
-
-# Stack
-SP = 0b00000111     # Stack pointer
-PUSH = 0b01000101   # Push to stack
-POP = 0b01000110    # Pop from stack
-
-# Subroutines
-CALL = 0b01010000   # Subroutine call
-RET = 0b00010001    # Return from subroutine
-EQ = 0b00000111
-JMP = 0b01010100    # Jump
-JEQ = 0b01010101    # Jump if equal
-JNE = 0b01010110    # Jump if not equal
+# OP CODES AND what regular number their binary translates to 
+LDI = 0b10000010 # 130 
+PRN = 0b01000111 # 71
+HLT = 0b00000001 # 1
+ADD = 0b10100000 # 160 
+MUL = 0b10100010 # 162
+PUSH = 0b01000101 # 69
+POP = 0b01000110 # 70
+CALL = 0b01010000 # 80
+RET = 0b00010001 # 17 
+CMP = 0b10100111 # 167  
+JMP = 0b01010100 # 84
+JEQ = 0b01010101 # 85
+JNE = 0b01010110 # 86
+XOR = 0b10101011 # 171
+AND = 0b10101000 # 168
+OR =  0b10101010 # 170
 
 class CPU:
     """Main CPU class."""
+
     def __init__(self):
-        self.ram = [0] * 256     # Ram
-        self.reg = [0] * 8       # Registers
-        self.flag_reg = [0] * 8  # Flags 
-        self.pc = 0              # Program counter
-        self.running = True      # machine state
-        
-        self.branch_table = {
-            NOP : self.NOP,
-            HLT : self.HLT,
-            PRN : self.PRN,
-            LDI : self.LDI,
-            MUL : self.MUL,
-            ADD : self.ADD,
-            SUB : self.SUB,
-            PUSH : self.PUSH,
-            POP : self.POP,
-            CALL : self.CALL,
-            RET : self.RET,
-            CMP : self.CMP,
-            JMP : self.JMP,
-            JEQ : self.JEQ,
-            JNE : self.JNE
+        """Construct a new CPU."""
+        self.FL = 0b00000000 # equal flag 
+        self.SP = 7 # stack pointer
+        self.pc = 0 # program counter
+        self.reg = [0] * 8 # 8 registers
+        self.ram = [0] * 256 # 256 ram storage
+        self.running = True
+        # table of op codes to functions defined below 
+        self.instructions = {
+            LDI: self.LDI,
+            PRN: self.PRN,
+            ADD: self.ADD,
+            MUL: self.MUL,
+            PUSH: self.PUSH,
+            POP: self.POP,
+            HLT: self.HLT,
+            CALL: self.CALL,
+            RET: self.RET,
+            CMP: self.CMP,
+            JMP: self.JMP,
+            JEQ: self.JEQ,
+            JNE: self.JNE,
+            XOR: self.XOR,
+            AND: self.AND,
+            OR: self.OR 
         }
+    
+    # LOAD b into register a 
+    def LDI(self, operand_a: int, operand_b: int) -> None:
+        self.reg[operand_a] = operand_b
 
-    def load(self):
-        filename = sys.argv[1]
+    # PRINT THING IN A
+    def PRN(self, operand_a: int, operand_b: int) -> None:
+        print(f'printing... {self.reg[operand_a]}')
+    
+    # call ALU integer add
+    def ADD(self, operand_a: int, operand_b: int) -> int:
+        self.alu('ADD', operand_a, operand_b)
+
+    # call ALU integer multiply
+    def MUL(self, operand_a: int, operand_b: int) -> int:
+        self.alu('MUL', operand_a, operand_b)
+
+    # call ALU XOR
+    def XOR(self, operand_a:int, operand_b: int) -> int:
+        self.alu('XOR', operand_a, operand_b)
+    # call ALU AND
+    def AND(self, operand_a:int, operand_b: int) -> int:
+        self.alu('AND', operand_a, operand_b)
+    # call ALU OR
+    def OR(self, operand_a:int, operand_b: int) -> int:
+        self.alu('OR', operand_a, operand_b)
+
+    def PUSH(self, operand_a: int, operand_b: int) -> None:
+        # decrement self.SP (stack pointer)
+        self.reg[self.SP] -= 1
+        # copy value from register into ram address pointed by self.SP
+        address = self.reg[self.SP]
+        self.ram_write(self.reg[operand_a], address)
+
+    def POP(self, operand_a: int, operand_b: int) -> int:
+        address = self.reg[self.SP]
+        # copy value from the self.SP address into the given register
+        self.reg[operand_a] = self.ram_read(address)
+        # increment self.SP (stack pointer)
+        self.reg[self.SP] += 1
+
+    def CALL(self, operand_a: int, operand_b: int) -> None: 
+        # decrement SP
+        self.reg[self.SP] -= 1
+        # push that instruction onto the stack
+        self.ram_write(self.pc + 2, self.reg[self.SP])
+        # PC is set to the address stored in the given register
+        # We jump to that location in RAM
+        self.pc = self.reg[operand_a]
+
+    def RET(self, operand_a: int, operand_b: int) -> None:
+        # Pop the value from the top of the stack and store it in the PC.
+        address = self.reg[self.SP]
+        self.pc = self.ram_read(address)
+        # increment self.SP (stack pointer)
+        self.reg[self.SP] += 1
+
+    # stops program since while loop looks for a false 
+    def HLT(self, operand_a: int, operand_b: int) -> None:
+        self.running = False
+
+    def CMP(self, operand_a: int, operand_b: int) -> None:
+        self.alu('CMP', operand_a, operand_b)
+    
+    # Jump to the address stored in the given register.
+    def JMP(self, operand_a: int, operand_b: int) -> None:
+        # Set the `PC` to the address stored in the given register.
+        self.pc = self.reg[operand_a]
+
+        # If `equal` flag is set (true), jump to the address stored in the given register.
+        # Else, we have to increment PC by 2 to go to next instruction (THIS SHOULD BE IN THE SPEC)
+        # since otherwise all it does is equivalent to pass 
+    def JEQ(self, operand_a: int, operand_b: int) -> None:
+        if self.FL & 0b1 == 1:
+            self.pc = self.reg[operand_a]
+        else:
+            self.pc += 2 
+        # If `E` flag is clear (false, 0), jump to the address stored in the given register.
+        # Else, we have to increment PC by 2 to go to next instruction (THIS SHOULD BE IN THE SPEC)
+        # since otherwise all it does is equivalent to pass 
+    def JNE(self, operand_a: int, operand_b: int) -> None:
+        if self.FL & 0b1 == 0:
+            self.pc = self.reg[operand_a]
+        else:
+            self.pc += 2
+
+
+
+    def load(self, filename) -> None:
+        """Load a program into memory."""
         address = 0
-
-        with open(filename) as f:
-            for line in f:
-                line = line.split('#')[0].strip()
+        with open(filename, 'r') as f:
+            program = f.readlines()
+            for line in program:
+                line = line.split('#')
+                line = line[0].strip()
                 if line == '':
                     continue
-                try:
-                    v = int(line, 2)
-                except ValueError:
-                    continue
-                self.ram_write(address, v)
+                # convert to binary and save to ram
+                # silly contrived thing in our python simulator
+                self.ram[address] = int(line, 2)
                 address += 1
 
-
-    def alu(self, op, reg_a, reg_b):
+    # math operations on A and B, storing and returning from A
+    # registers limited to 8 bits, 0-255, so bitwise AND with 255 to do modulus 
+    def alu(self, op, reg_a: int, reg_b: int) -> int:
         """ALU operations."""
-
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        
+            self.reg[reg_a] = self.reg[reg_a] & 0xFF
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
-        
-        elif op == "SUB":
-            self.reg[reg_a] -= self.reg[reg_b]
-        
-        elif op == "CMP":
-            if reg_a == reg_b:
-                self.flag_reg[EQ] = 0b00000001
+            self.reg[reg_a] = self.reg[reg_a] & 0xFF
+        elif op == "CMP": # Compare the values in two registers. `FL` bits: `00000LGE`
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.FL = 0b00000001
+            elif self.reg[reg_a] < self.reg[reg_b]:
+                self.FL = 0b00000100
             else:
-                self.flag_reg[EQ] = 0b00000000
-        
-        elif op == "AND":
-            self.reg[reg_a] = self.reg[reg_a] & self.reg[reg_b]
-        
-        elif op == "MOD":
-            if self.reg[reg_b] == 0:
-                print("Cannot mod by value of 0")
-                self.HLT(reg_a, reg_b)
-            else:
-                self.reg[reg_a] %= self.reg[reg_b]
-        
-        elif op == "SHL":
-            self.reg[reg_a] << self.reg[reg_b]
-        
-        elif op == "SHR":
-            self.reg[reg_a] >> self.reg[reg_b]
-        
-        elif op == "OR":
-            self.reg[reg_a] = self.reg[reg_a] | self.reg[reg_b]
-        
-        elif op == "NOT":
-            self.reg[reg_a] -= 0b11111111
-        
+                self.FL = 0b00000010 
         elif op == "XOR":
-            self.reg[reg_a] = self.reg[reg_a] ^ self.reg[reg_b]
-        
+            self.reg[reg_a] ^= self.reg[reg_b]
+            self.reg[reg_a] = self.reg[reg_a] & 0xFF
+        elif op == "AND":
+            self.reg[reg_a] &= self.reg[reg_b]
+            self.reg[reg_a] = self.reg[reg_a] & 0xFF
+        elif op == "OR":
+            self.reg[reg_a] |= self.reg[reg_b]
+            self.reg[reg_a] = self.reg[reg_a] & 0xFF            
         else:
             raise Exception("Unsupported ALU operation")
 
-    def trace(self):
+        return self.reg[reg_a]
+
+    def ram_read(self, address: int) -> int:
+        """Return an address in RAM."""
+
+        return self.ram[address]
+
+    def ram_write(self, value: int, address: int) -> None:
+        """Set an address in RAM to a certain value."""
+
+        self.ram[address] = value
+
+    def trace(self) -> None:
         """
         Handy function to print out the CPU state. You might want to call this
         from run() if you need help debugging.
         """
 
-        print(f"TRACE: %02X | %02X %02X %02X |" % (
+        print(f"TRACE: %02X %02X | %02X %02X %02X |" % (
             self.pc,
-            #self.fl,
+            self.FL,
             #self.ie,
             self.ram_read(self.pc),
             self.ram_read(self.pc + 1),
@@ -144,90 +214,23 @@ class CPU:
 
         print()
 
-    def LDI(self, reg_a, reg_b):
-        self.reg[reg_a] = reg_b
-
-    def HLT(self, reg_a, reg_b):
-        self.running = False
-    
-    def PRN(self, reg_a, reg_b):
-        print(self.reg[reg_a])
-    
-    def MUL(self, reg_a, reg_b):
-        self.alu("MUL", reg_a, reg_b)
-
-    def SUB(self, reg_a, reg_b):
-        self.alu("SUB", reg_a, reg_b)
-
-    def ADD(self, reg_a, reg_b):
-        self.alu("ADD", reg_a, reg_b)
-
-    def NOP(self, reg_a, reg_b):
-        pass
-
-    def PUSH(self, reg_a, reg_b):
-        reg_num = self.ram[reg_a]
-        value = self.reg[reg_num]
-        self.reg[SP] -= 1
-        top_of_stack_add = self.reg[SP]
-        self.ram[top_of_stack_add] = value
-
-    def POP(self, reg_a, reg_b):
-        top_of_stack_add = self.reg[SP]
-        value = self.ram[top_of_stack_add]
-        reg_num = self.ram[reg_a]
-        self.reg[reg_num] = value
-        self.reg[SP] += 1
-
-    def CALL(self, reg_a, reg_b):
-        return_addr = reg_b
-
-        self.reg[SP] -= 1
-        self.ram[self.reg[SP]] = return_addr
-
-        reg_num = self.ram[reg_a]
-        subroutine_addr = self.reg[reg_num]
-
-        self.pc = subroutine_addr
-
-    def RET(self, reg_a, reg_b):
-        subroutine_addr = self.ram[self.reg[SP]]
-        self.reg[SP] += 1
-        self.pc = subroutine_addr
-
-    def CMP(self, reg_a, reg_b):
-        reg_num1 = self.reg[reg_a]
-        reg_num2 = self.reg[reg_b]
-        self.alu("CMP", reg_num1, reg_num2)
-
-    def JMP(self, reg_a, reg_b):
-        self.pc = self.reg[reg_a]
-
-    def JEQ(self, reg_a, reg_b):
-        if self.flag_reg[EQ] == 0b00000001:
-            self.pc = self.reg[reg_a]
-        else:
-            self.pc += 2
-
-    def JNE(self, reg_a, reg_b):
-        if self.flag_reg[EQ] == 0b00000000:
-            self.pc = self.reg[reg_a]
-        else:
-            self.pc += 2
-    
-    def ram_read(self, address):
-        return self.ram[address]
-    
-    def ram_write(self, address, value):
-        self.ram[address] = value
-    
     def run(self):
-        while self.running:
-            ir = self.ram_read(self.pc)
-            pc_flag = (ir & 0b00010000) >> 4
-            reg_num1 = self.ram[self.pc + 1]
-            reg_num2 = self.ram[self.pc + 2]
-            self.branch_table[ir](reg_num1, reg_num2)
-            if pc_flag == 0:
-                move = int((ir & 0b11000000) >> 6)
-                self.pc += move + 1
+        """Run the CPU."""
+
+        while self.running is True:
+            IR = self.ram_read(self.pc)
+            #self.trace()
+          
+            instruction_length = (IR >> 6) + 1 
+            operand_a = self.ram_read(self.pc + 1) 
+            operand_b = self.ram_read(self.pc + 2)
+            # if the op code is in the instructions, execute from branch table
+            if IR in self.instructions:
+                self.instructions[IR](operand_a, operand_b)
+            else:
+                print("Invalid instruction")
+            if not IR & 0b00010000: # increment program counter except in case of JNE, JEQ, RET 
+                self.pc += instruction_length
+
+            # self.pc += instruction_length
+            # self.trace()
